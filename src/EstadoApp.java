@@ -1,4 +1,4 @@
 public class EstadoApp {
     public static String baseDeDatosActual = null;
-    public static String ultimaConsulta = null;
+    public static String ultimaOperacion = "";
 }

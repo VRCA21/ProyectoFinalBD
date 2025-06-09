@@ -39,6 +39,8 @@ public class MainFrame extends JFrame {
         menu.add(btnCrearTabla);
         menu.add(btnOperar);
 
+        UltimaOperacion panelUltimaOperacion = new UltimaOperacion();
+
         add(menu, BorderLayout.WEST);
         add(panelPrincipal, BorderLayout.CENTER);
     }

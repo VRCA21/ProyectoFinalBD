@@ -3,27 +3,41 @@ import java.awt.*;
 import java.sql.*;
 
 public class SeleccionarBaseDeDatosPanel extends JPanel {
-    public SeleccionarBaseDeDatosPanel() {
-        setLayout(new BorderLayout());
-        DefaultListModel<String> model = new DefaultListModel<>();
-        JList<String> lista = new JList<>(model);
-        JButton btnSeleccionar = new JButton("Seleccionar BD");
+    private JComboBox<String> comboBD;
+    private JButton btnSeleccionar;
 
-        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/", ConexionBD.USUARIO, ConexionBD.CONTRASENA);
-             ResultSet rs = conn.getMetaData().getCatalogs()) {
-            while (rs.next()) {
-                model.addElement(rs.getString(1));
-            }
-        } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error cargando bases: " + ex.getMessage());
-        }
+    public SeleccionarBaseDeDatosPanel() {
+        setLayout(new FlowLayout());
+
+        comboBD = new JComboBox<>();
+        btnSeleccionar = new JButton("Seleccionar");
+
+        add(new JLabel("Base de Datos:"));
+        add(comboBD);
+        add(btnSeleccionar);
+
+        cargarBasesDeDatos();
 
         btnSeleccionar.addActionListener(e -> {
-            EstadoApp.baseDeDatosActual = lista.getSelectedValue();
-            JOptionPane.showMessageDialog(this, "BD seleccionada: " + EstadoApp.baseDeDatosActual);
+            String seleccion = (String) comboBD.getSelectedItem();
+            if (seleccion != null && !seleccion.isEmpty()) {
+                EstadoApp.baseDeDatosActual = seleccion;
+                JOptionPane.showMessageDialog(this, "Base seleccionada: " + seleccion);
+            }
         });
+    }
 
-        add(new JScrollPane(lista), BorderLayout.CENTER);
-        add(btnSeleccionar, BorderLayout.SOUTH);
+    private void cargarBasesDeDatos() {
+        comboBD.removeAllItems();
+        try (Connection conn = DriverManager.getConnection(ConexionBD.URL, ConexionBD.USUARIO, ConexionBD.CONTRASENA);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SHOW DATABASES")) {
+
+            while (rs.next()) {
+                comboBD.addItem(rs.getString(1));
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar bases: " + e.getMessage());
+        }
     }
 }

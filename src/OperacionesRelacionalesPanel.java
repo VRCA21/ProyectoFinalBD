@@ -102,7 +102,7 @@ public class OperacionesRelacionalesPanel extends JPanel {
                 return;
             }
 
-            EstadoApp.ultimaConsulta = consultaSQL;
+            EstadoApp.ultimaOperacion = consultaSQL;
 
             ResultSet rs = st.executeQuery(consultaSQL);
 
