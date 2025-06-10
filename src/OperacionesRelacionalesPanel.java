@@ -1,57 +1,67 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.awt.event.*;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
 
 public class OperacionesRelacionalesPanel extends JPanel {
+
     private JTextField campoTabla1;
     private JTextField campoTabla2;
-    private JComboBox<String> comboOperacion;
     private JTextField campoCondicion;
+    private JComboBox<String> comboOperacion;
     private JTextArea areaResultado;
-    private JButton btnEjecutar;
+    private JButton botonEjecutar;
 
     public OperacionesRelacionalesPanel() {
         setLayout(new BorderLayout());
 
-        JPanel panelTop = new JPanel(new GridLayout(4, 2, 5, 5));
-
+        // Panel de entrada
+        JPanel panelEntrada = new JPanel(new GridLayout(4, 2, 5, 5));
+        panelEntrada.add(new JLabel("Tabla 1:"));
         campoTabla1 = new JTextField();
+        panelEntrada.add(campoTabla1);
+
+        panelEntrada.add(new JLabel("Tabla 2:"));
         campoTabla2 = new JTextField();
-        comboOperacion = new JComboBox<>(new String[]{
-                "SELECCIÓN",
-                "PROYECCIÓN",
-                "UNION",
-                "INTERSECCIÓN",
-                "DIFERENCIA",
-                "PRODUCTO CARTESIANO",
-                "JOIN (natural)"
-        });
+        panelEntrada.add(campoTabla2);
+
+        panelEntrada.add(new JLabel("Condición / Atributos (según operación):"));
         campoCondicion = new JTextField();
+        panelEntrada.add(campoCondicion);
 
-        panelTop.add(new JLabel("Tabla 1:"));
-        panelTop.add(campoTabla1);
-        panelTop.add(new JLabel("Tabla 2:"));
-        panelTop.add(campoTabla2);
-        panelTop.add(new JLabel("Operación:"));
-        panelTop.add(comboOperacion);
-        panelTop.add(new JLabel("Condición / Atributos:"));
-        panelTop.add(campoCondicion);
+        panelEntrada.add(new JLabel("Operación:"));
+        comboOperacion = new JComboBox<>(new String[]{
+                "SELECCIÓN", "PROYECCIÓN", "UNION", "INTERSECCIÓN",
+                "DIFERENCIA", "PRODUCTO CARTESIANO", "JOIN (natural)"
+        });
+        panelEntrada.add(comboOperacion);
 
-        btnEjecutar = new JButton("Ejecutar Operación");
+        add(panelEntrada, BorderLayout.NORTH);
 
-        areaResultado = new JTextArea();
+        // Área de resultado
+        areaResultado = new JTextArea(15, 50);
         areaResultado.setEditable(false);
         JScrollPane scroll = new JScrollPane(areaResultado);
-        scroll.setPreferredSize(new Dimension(800, 350));
+        add(scroll, BorderLayout.CENTER);
 
-        add(panelTop, BorderLayout.NORTH);
-        add(btnEjecutar, BorderLayout.CENTER);
-        add(scroll, BorderLayout.SOUTH);
+        // Botón ejecutar
+        botonEjecutar = new JButton("Ejecutar");
+        add(botonEjecutar, BorderLayout.SOUTH);
 
-        btnEjecutar.addActionListener(this::ejecutarOperacion);
+        botonEjecutar.addActionListener(this::ejecutarOperacion);
+    }
+
+    // Clase para retornar nombre de la relación y datos juntos
+    private static class ResultadoRelacion {
+        String nombreRelacion;
+        List<Map<String, String>> filas;
+
+        ResultadoRelacion(String nombreRelacion, List<Map<String, String>> filas) {
+            this.nombreRelacion = nombreRelacion;
+            this.filas = filas;
+        }
     }
 
     private void ejecutarOperacion(ActionEvent e) {
@@ -81,201 +91,48 @@ public class OperacionesRelacionalesPanel extends JPanel {
         try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/" + bd,
                 ConexionBD.USUARIO, ConexionBD.CONTRASENA)) {
 
-            List<Map<String, String>> resultado;
+            ResultadoRelacion resultadoRelacion = null;
 
             switch (operacion) {
-                case "SELECCIÓN" -> resultado = ejecutarSeleccion(conn, tabla1, condicion);
-                case "PROYECCIÓN" -> resultado = ejecutarProyeccion(conn, tabla1, condicion);
-                case "UNION" -> resultado = ejecutarUnion(conn, tabla1, tabla2);
-                case "INTERSECCIÓN" -> resultado = ejecutarInterseccion(conn, tabla1, tabla2);
-                case "DIFERENCIA" -> resultado = ejecutarDiferencia(conn, tabla1, tabla2);
-                case "PRODUCTO CARTESIANO" -> resultado = ejecutarProductoCartesiano(conn, tabla1, tabla2);
-                case "JOIN (natural)" -> resultado = ejecutarJoinNatural(conn, tabla1, tabla2);
-                default -> resultado = null;
+                case "SELECCIÓN" -> resultadoRelacion = new ResultadoRelacion(
+                        "Seleccion_" + tabla1, ejecutarSeleccion(conn, tabla1, condicion));
+                case "PROYECCIÓN" -> resultadoRelacion = new ResultadoRelacion(
+                        "Proyeccion_" + tabla1, ejecutarProyeccion(conn, tabla1, condicion));
+                case "UNION" -> resultadoRelacion = ejecutarUnion(conn, tabla1, tabla2);
+                case "INTERSECCIÓN" -> resultadoRelacion = ejecutarInterseccion(conn, tabla1, tabla2);
+                case "DIFERENCIA" -> resultadoRelacion = ejecutarDiferencia(conn, tabla1, tabla2);
+                case "PRODUCTO CARTESIANO" -> resultadoRelacion = ejecutarProductoCartesiano(conn, tabla1, tabla2);
+                case "JOIN (natural)" -> resultadoRelacion = ejecutarJoinNatural(conn, tabla1, tabla2);
             }
 
-            mostrarResultado(resultado);
+            if (resultadoRelacion != null) {
+                mostrarResultadoConNombre(resultadoRelacion);
+            } else {
+                areaResultado.setText("No se pudo obtener resultado.");
+            }
         } catch (SQLException ex) {
             areaResultado.setText("Error: " + ex.getMessage());
         }
     }
 
-    private List<Map<String, String>> obtenerFilas(Connection conn, String tabla) {
-        List<Map<String, String>> filas = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tabla)) {
-            ResultSetMetaData meta = rs.getMetaData();
-            while (rs.next()) {
-                Map<String, String> tupla = new LinkedHashMap<>();
-                for (int i = 1; i <= meta.getColumnCount(); i++) {
-                    tupla.put(meta.getColumnName(i), rs.getString(i));
-                }
-                filas.add(tupla);
-            }
-        } catch (SQLException e) {
-            areaResultado.setText("Error: " + e.getMessage());
-        }
-        return filas;
-    }
+    private void mostrarResultadoConNombre(ResultadoRelacion resultadoRelacion) {
+        List<Map<String, String>> resultado = resultadoRelacion.filas;
+        StringBuilder sb = new StringBuilder();
 
-    // SELECCIÓN
-    private List<Map<String, String>> ejecutarSeleccion(Connection conn, String tabla, String condicionTexto) {
-        List<Map<String, String>> datos = obtenerFilas(conn, tabla);
-        List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : datos) {
-            if (condicionTexto.isEmpty() || evaluarCondicion(tupla, condicionTexto)) {
-                resultado.add(tupla);
-            }
-        }
-        return resultado;
-    }
+        sb.append("Relación resultado: ").append(resultadoRelacion.nombreRelacion).append("\n\n");
 
-    // PROYECCIÓN
-    private List<Map<String, String>> ejecutarProyeccion(Connection conn, String tabla, String atributosTexto) {
-        String[] atributos = atributosTexto.split(",");
-        List<Map<String, String>> datos = obtenerFilas(conn, tabla);
-
-        List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : datos) {
-            Map<String, String> nuevaTupla = new LinkedHashMap<>();
-            for (String atributo : atributos) {
-                if (tupla.containsKey(atributo.trim())) {
-                    nuevaTupla.put(atributo.trim(), tupla.get(atributo.trim()));
-                }
-            }
-            if (!resultado.contains(nuevaTupla)) {
-                resultado.add(nuevaTupla);
-            }
-        }
-        return resultado;
-    }
-
-    // UNION
-    private List<Map<String, String>> ejecutarUnion(Connection conn, String t1, String t2) {
-        List<Map<String, String>> R = obtenerFilas(conn, t1);
-        List<Map<String, String>> S = obtenerFilas(conn, t2);
-        List<Map<String, String>> resultado = new ArrayList<>(R);
-        for (Map<String, String> tupla : S) {
-            if (!resultado.contains(tupla)) {
-                resultado.add(tupla);
-            }
-        }
-        return resultado;
-    }
-
-    // INTERSECCIÓN
-    private List<Map<String, String>> ejecutarInterseccion(Connection conn, String t1, String t2) {
-        List<Map<String, String>> R = obtenerFilas(conn, t1);
-        List<Map<String, String>> S = obtenerFilas(conn, t2);
-        List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : R) {
-            if (S.contains(tupla)) {
-                resultado.add(tupla);
-            }
-        }
-        return resultado;
-    }
-
-    // DIFERENCIA
-    private List<Map<String, String>> ejecutarDiferencia(Connection conn, String t1, String t2) {
-        List<Map<String, String>> R = obtenerFilas(conn, t1);
-        List<Map<String, String>> S = obtenerFilas(conn, t2);
-        List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : R) {
-            if (!S.contains(tupla)) {
-                resultado.add(tupla);
-            }
-        }
-        return resultado;
-    }
-
-    // PRODUCTO CARTESIANO
-    private List<Map<String, String>> ejecutarProductoCartesiano(Connection conn, String t1, String t2) {
-        List<Map<String, String>> R = obtenerFilas(conn, t1);
-        List<Map<String, String>> S = obtenerFilas(conn, t2);
-        List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> t1map : R) {
-            for (Map<String, String> t2map : S) {
-                Map<String, String> nueva = new LinkedHashMap<>(t1map);
-                for (String k : t2map.keySet()) {
-                    nueva.put("t2." + k, t2map.get(k));
-                }
-                resultado.add(nueva);
-            }
-        }
-        return resultado;
-    }
-
-    // JOIN NATURAL
-    private List<Map<String, String>> ejecutarJoinNatural(Connection conn, String t1, String t2) {
-        List<Map<String, String>> R = obtenerFilas(conn, t1);
-        List<Map<String, String>> S = obtenerFilas(conn, t2);
-        List<Map<String, String>> resultado = new ArrayList<>();
-
-        if (R.isEmpty() || S.isEmpty()) return resultado;
-
-        Set<String> comunes = new HashSet<>(R.get(0).keySet());
-        comunes.retainAll(S.get(0).keySet());
-
-        for (Map<String, String> r : R) {
-            for (Map<String, String> s : S) {
-                boolean coincide = true;
-                for (String atr : comunes) {
-                    if (!Objects.equals(r.get(atr), s.get(atr))) {
-                        coincide = false;
-                        break;
-                    }
-                }
-                if (coincide) {
-                    Map<String, String> nueva = new LinkedHashMap<>(r);
-                    for (Map.Entry<String, String> e : s.entrySet()) {
-                        if (!comunes.contains(e.getKey())) {
-                            nueva.put(e.getKey(), e.getValue());
-                        }
-                    }
-                    resultado.add(nueva);
-                }
-            }
-        }
-        return resultado;
-    }
-
-    private boolean evaluarCondicion(Map<String, String> tupla, String condicion) {
-        try {
-            String[] partes = condicion.split("[<>=!]+", 2);
-            if (partes.length < 2) return false;
-            String atributo = partes[0].trim();
-            String valor = partes[1].trim().replace("'", "");
-            if (!tupla.containsKey(atributo)) return false;
-            String actual = tupla.get(atributo);
-            if (condicion.contains("==")) return actual.equals(valor);
-            if (condicion.contains("!=")) return !actual.equals(valor);
-            if (condicion.contains(">=")) return Double.parseDouble(actual) >= Double.parseDouble(valor);
-            if (condicion.contains("<=")) return Double.parseDouble(actual) <= Double.parseDouble(valor);
-            if (condicion.contains(">")) return Double.parseDouble(actual) > Double.parseDouble(valor);
-            if (condicion.contains("<")) return Double.parseDouble(actual) < Double.parseDouble(valor);
-        } catch (Exception ex) {
-            // Si falla, asumimos false
-        }
-        return false;
-    }
-
-    private void mostrarResultado(List<Map<String, String>> resultado) {
         if (resultado == null || resultado.isEmpty()) {
-            areaResultado.setText("No hay resultados para la operación.");
+            sb.append("(No hay resultados para la operación)");
+            areaResultado.setText(sb.toString());
             return;
         }
 
-        StringBuilder sb = new StringBuilder();
-
-        // Encabezado
         Map<String, String> primeraFila = resultado.get(0);
         for (String col : primeraFila.keySet()) {
             sb.append(col).append("\t");
         }
         sb.append("\n");
 
-        // Filas
         for (Map<String, String> fila : resultado) {
             for (String val : fila.values()) {
                 sb.append(val).append("\t");
@@ -285,13 +142,161 @@ public class OperacionesRelacionalesPanel extends JPanel {
         areaResultado.setText(sb.toString());
     }
 
-    // Para probar rápido
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("Operaciones Relacionales");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.getContentPane().add(new OperacionesRelacionalesPanel());
-        frame.pack();
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+
+    // Métodos para obtener filas desde BD y ejecutar operaciones
+
+    private List<Map<String, String>> obtenerFilas(Connection conn, String tabla) throws SQLException {
+        List<Map<String, String>> filas = new ArrayList<>();
+        String sql = "SELECT * FROM " + tabla;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            ResultSetMetaData md = rs.getMetaData();
+            int columnas = md.getColumnCount();
+            while (rs.next()) {
+                Map<String, String> fila = new LinkedHashMap<>();
+                for (int i = 1; i <= columnas; i++) {
+                    fila.put(md.getColumnName(i), rs.getString(i));
+                }
+                filas.add(fila);
+            }
+        }
+        return filas;
+    }
+
+    private List<Map<String, String>> ejecutarSeleccion(Connection conn, String tabla, String condicion) throws SQLException {
+        List<Map<String, String>> resultado = new ArrayList<>();
+        String sql = "SELECT * FROM " + tabla + " WHERE " + condicion;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            ResultSetMetaData md = rs.getMetaData();
+            int columnas = md.getColumnCount();
+            while (rs.next()) {
+                Map<String, String> fila = new LinkedHashMap<>();
+                for (int i = 1; i <= columnas; i++) {
+                    fila.put(md.getColumnName(i), rs.getString(i));
+                }
+                resultado.add(fila);
+            }
+        }
+        return resultado;
+    }
+
+    private List<Map<String, String>> ejecutarProyeccion(Connection conn, String tabla, String atributos) throws SQLException {
+        List<Map<String, String>> resultado = new ArrayList<>();
+        String sql = "SELECT " + atributos + " FROM " + tabla;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            ResultSetMetaData md = rs.getMetaData();
+            int columnas = md.getColumnCount();
+            while (rs.next()) {
+                Map<String, String> fila = new LinkedHashMap<>();
+                for (int i = 1; i <= columnas; i++) {
+                    fila.put(md.getColumnName(i), rs.getString(i));
+                }
+                resultado.add(fila);
+            }
+        }
+        return resultado;
+    }
+
+    private ResultadoRelacion ejecutarUnion(Connection conn, String t1, String t2) throws SQLException {
+        List<Map<String, String>> R = obtenerFilas(conn, t1);
+        List<Map<String, String>> S = obtenerFilas(conn, t2);
+        List<Map<String, String>> resultado = new ArrayList<>(R);
+        for (Map<String, String> tupla : S) {
+            if (!resultado.contains(tupla)) {
+                resultado.add(tupla);
+            }
+        }
+        return new ResultadoRelacion("Union_" + t1 + "_" + t2, resultado);
+    }
+
+    private ResultadoRelacion ejecutarInterseccion(Connection conn, String t1, String t2) throws SQLException {
+        List<Map<String, String>> R = obtenerFilas(conn, t1);
+        List<Map<String, String>> S = obtenerFilas(conn, t2);
+        List<Map<String, String>> resultado = new ArrayList<>();
+        for (Map<String, String> tupla : R) {
+            if (S.contains(tupla)) {
+                resultado.add(tupla);
+            }
+        }
+        return new ResultadoRelacion("Interseccion_" + t1 + "_" + t2, resultado);
+    }
+
+    private ResultadoRelacion ejecutarDiferencia(Connection conn, String t1, String t2) throws SQLException {
+        List<Map<String, String>> R = obtenerFilas(conn, t1);
+        List<Map<String, String>> S = obtenerFilas(conn, t2);
+        List<Map<String, String>> resultado = new ArrayList<>();
+        for (Map<String, String> tupla : R) {
+            if (!S.contains(tupla)) {
+                resultado.add(tupla);
+            }
+        }
+        return new ResultadoRelacion("Diferencia_" + t1 + "_" + t2, resultado);
+    }
+
+    private ResultadoRelacion ejecutarProductoCartesiano(Connection conn, String t1, String t2) throws SQLException {
+        List<Map<String, String>> R = obtenerFilas(conn, t1);
+        List<Map<String, String>> S = obtenerFilas(conn, t2);
+        List<Map<String, String>> resultado = new ArrayList<>();
+
+        for (Map<String, String> filaR : R) {
+            for (Map<String, String> filaS : S) {
+                Map<String, String> nuevaFila = new LinkedHashMap<>();
+                // Agregar columnas de la primera tabla con prefijo para evitar confusión
+                for (String colR : filaR.keySet()) {
+                    nuevaFila.put(t1 + "." + colR, filaR.get(colR));
+                }
+                // Agregar columnas de la segunda tabla con prefijo
+                for (String colS : filaS.keySet()) {
+                    nuevaFila.put(t2 + "." + colS, filaS.get(colS));
+                }
+                resultado.add(nuevaFila);
+            }
+        }
+        return new ResultadoRelacion("ProductoCartesiano_" + t1 + "_" + t2, resultado);
+    }
+
+    private ResultadoRelacion ejecutarJoinNatural(Connection conn, String t1, String t2) throws SQLException {
+        List<Map<String, String>> R = obtenerFilas(conn, t1);
+        List<Map<String, String>> S = obtenerFilas(conn, t2);
+        List<Map<String, String>> resultado = new ArrayList<>();
+
+        if (R.isEmpty() || S.isEmpty()) {
+            return new ResultadoRelacion("JoinNatural_" + t1 + "_" + t2, resultado);
+        }
+
+        Set<String> columnasR = R.get(0).keySet();
+        Set<String> columnasS = S.get(0).keySet();
+
+        // Obtener columnas comunes para join natural
+        Set<String> columnasComunes = new HashSet<>(columnasR);
+        columnasComunes.retainAll(columnasS);
+
+        for (Map<String, String> filaR : R) {
+            for (Map<String, String> filaS : S) {
+                boolean coinciden = true;
+                for (String col : columnasComunes) {
+                    if (!Objects.equals(filaR.get(col), filaS.get(col))) {
+                        coinciden = false;
+                        break;
+                    }
+                }
+                if (coinciden) {
+                    Map<String, String> nuevaFila = new LinkedHashMap<>();
+                    // Agregar todas las columnas de R
+                    nuevaFila.putAll(filaR);
+                    // Agregar columnas de S que no estén en comunes para no repetir
+                    for (String col : columnasS) {
+                        if (!columnasComunes.contains(col)) {
+                            nuevaFila.put(col, filaS.get(col));
+                        }
+                    }
+                    resultado.add(nuevaFila);
+                }
+            }
+        }
+
+        return new ResultadoRelacion("JoinNatural_" + t1 + "_" + t2, resultado);
     }
 }
