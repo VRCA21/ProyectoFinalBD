@@ -4,8 +4,8 @@ import java.sql.*;
 import java.util.Vector;
 
 public class OperacionesRelacionalesPanel extends JPanel {
-    private JComboBox<String> comboTabla1;
-    private JComboBox<String> comboTabla2;
+    private JTextField campoTabla1;
+    private JTextField campoTabla2;
     private JComboBox<String> comboOperacion;
     private JTextArea areaResultado;
     private JButton btnEjecutar;
@@ -15,8 +15,8 @@ public class OperacionesRelacionalesPanel extends JPanel {
 
         JPanel panelTop = new JPanel(new GridLayout(3, 2, 5, 5));
 
-        comboTabla1 = new JComboBox<>();
-        comboTabla2 = new JComboBox<>();
+        campoTabla1 = new JTextField();
+        campoTabla2 = new JTextField();
         comboOperacion = new JComboBox<>(new String[] {
                 "UNION",
                 "INTERSECCIÓN",
@@ -26,9 +26,9 @@ public class OperacionesRelacionalesPanel extends JPanel {
         });
 
         panelTop.add(new JLabel("Tabla 1:"));
-        panelTop.add(comboTabla1);
+        panelTop.add(campoTabla1);
         panelTop.add(new JLabel("Tabla 2:"));
-        panelTop.add(comboTabla2);
+        panelTop.add(campoTabla2);
         panelTop.add(new JLabel("Operación:"));
         panelTop.add(comboOperacion);
 
@@ -37,53 +37,24 @@ public class OperacionesRelacionalesPanel extends JPanel {
         areaResultado = new JTextArea();
         areaResultado.setEditable(false);
         JScrollPane scroll = new JScrollPane(areaResultado);
+        scroll.setPreferredSize(new Dimension(800, 350));
 
         add(panelTop, BorderLayout.NORTH);
         add(btnEjecutar, BorderLayout.CENTER);
         add(scroll, BorderLayout.SOUTH);
 
-        // Ajustar tamaño del scroll para que se vea mejor
-        scroll.setPreferredSize(new Dimension(800, 350));
-
         btnEjecutar.addActionListener(e -> ejecutarOperacion());
-
-        cargarTablas();
-    }
-
-    private void cargarTablas() {
-        comboTabla1.removeAllItems();
-        comboTabla2.removeAllItems();
-        String bd = EstadoApp.baseDeDatosActual;
-        if (bd == null) {
-            JOptionPane.showMessageDialog(this, "Selecciona una base de datos primero.");
-            return;
-        }
-        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/" + bd,
-                ConexionBD.USUARIO, ConexionBD.CONTRASENA);
-             ResultSet rs = conn.getMetaData().getTables(bd, null, "%", new String[]{"TABLE"})) {
-            while (rs.next()) {
-                String tabla = rs.getString("TABLE_NAME");
-                comboTabla1.addItem(tabla);
-                comboTabla2.addItem(tabla);
-            }
-        } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error al cargar tablas: " + ex.getMessage());
-        }
     }
 
     private void ejecutarOperacion() {
-        String tabla1 = (String) comboTabla1.getSelectedItem();
-        String tabla2 = (String) comboTabla2.getSelectedItem();
+        String tabla1 = campoTabla1.getText().trim();
+        String tabla2 = campoTabla2.getText().trim();
         String operacion = (String) comboOperacion.getSelectedItem();
         String bd = EstadoApp.baseDeDatosActual;
 
-        if (tabla1 == null || tabla2 == null) {
-            JOptionPane.showMessageDialog(this, "Selecciona ambas tablas.");
+        if (tabla1.isEmpty() || tabla2.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingresa los nombres de ambas tablas.");
             return;
-        }
-
-        if (tabla1.equals(tabla2) && (operacion.equals("DIFERENCIA") || operacion.equals("UNION") || operacion.equals("INTERSECCIÓN"))) {
-            // Operaciones entre la misma tabla sí son válidas, pero puede avisar o dejar pasar.
         }
 
         if (bd == null) {
@@ -115,9 +86,6 @@ public class OperacionesRelacionalesPanel extends JPanel {
     }
 
     private String generarConsulta(String t1, String t2, String op) throws SQLException {
-        // Para operaciones que requieren que las tablas tengan la misma estructura:
-        // UNION, INTERSECCIÓN, DIFERENCIA: las tablas deben tener mismas columnas compatibles
-
         switch (op) {
             case "UNION":
                 if (!tienenMismasColumnas(t1, t2))
@@ -186,6 +154,7 @@ public class OperacionesRelacionalesPanel extends JPanel {
         }
         sb.append("\n");
 
+        // Filas
         while (rs.next()) {
             for (int i = 1; i <= cols; i++) {
                 sb.append(rs.getString(i)).append("\t");

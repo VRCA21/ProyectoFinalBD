@@ -1,12 +1,14 @@
 import javax.swing.*;
 import java.awt.*;
 import java.sql.*;
+import java.util.Vector;
 
 public class VerTablasPanel extends JPanel {
     private DefaultListModel<String> modelo;
     private JList<String> listaTablas;
 
     public VerTablasPanel() {
+        System.out.println("Base de datos en VerTablasPanel: " + EstadoApp.baseDeDatosActual);
         setLayout(new BorderLayout());
 
         modelo = new DefaultListModel<>();
@@ -29,24 +31,20 @@ public class VerTablasPanel extends JPanel {
             return;
         }
 
-        try (Connection conn = DriverManager.getConnection(ConexionBD.URL + bd, ConexionBD.USUARIO, ConexionBD.CONTRASENA)) {
-            DatabaseMetaData meta = conn.getMetaData();
-            ResultSet rs = meta.getTables(bd, null, "%", new String[]{"TABLE"});
-
-            boolean hayTablas = false;
-            while (rs.next()) {
-                modelo.addElement(rs.getString("TABLE_NAME"));
-                hayTablas = true;
-            }
-
-            if (!hayTablas) {
+        try {
+            Vector<String> tablas = UtilidadesBD.obtenerNombresTablas(bd);
+            if (tablas.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No hay tablas en la base de datos seleccionada.");
+            } else {
+                for (String tabla : tablas) {
+                    modelo.addElement(tabla);
+                }
             }
-
         } catch (SQLException ex) {
             JOptionPane.showMessageDialog(this, "Error al obtener tablas: " + ex.getMessage());
         }
     }
+
 
     public String getTablaSeleccionada() {
         return listaTablas.getSelectedValue();
