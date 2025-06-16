@@ -5,16 +5,19 @@ import java.sql.*;
 public class SeleccionarBaseDeDatosPanel extends JPanel {
     private JComboBox<String> comboBD;
     private JButton btnSeleccionar;
+    private JButton btnActualizar;
 
     public SeleccionarBaseDeDatosPanel() {
         setLayout(new FlowLayout());
 
         comboBD = new JComboBox<>();
         btnSeleccionar = new JButton("Seleccionar");
+        btnActualizar = new JButton("Actualizar");
 
         add(new JLabel("Base de Datos:"));
         add(comboBD);
         add(btnSeleccionar);
+        add(btnActualizar);
 
         cargarBasesDeDatos();
 
@@ -25,6 +28,8 @@ public class SeleccionarBaseDeDatosPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Base seleccionada: " + seleccion);
             }
         });
+
+        btnActualizar.addActionListener(e -> cargarBasesDeDatos());
     }
 
     private void cargarBasesDeDatos() {

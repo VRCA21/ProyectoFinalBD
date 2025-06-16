@@ -1,17 +1,14 @@
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.sql.*;
 import java.util.*;
 import java.util.List;
 
-public class OperacionesRelacionalesPanel extends JPanel {
-    private final JTextField campoTabla1;
-    private final JTextField campoTabla2;
-    private final JComboBox<String> comboOperacion;
-    private final JTextField campoCondicion;
-    private final JButton botonEjecutar;
-    private final JTextArea areaResultado;
+public class OperacionesRelacionalesPanel extends JPanel { private final JTextField campoTabla1; private final JTextField campoTabla2; private final JComboBox<String> comboOperacion; private final JTextField campoCondicion; private final JButton botonEjecutar; private final JTable tablaResultado; private final DefaultTableModel modeloTabla;
 
     private ResultadoRelacion resultadoAnterior = null;
 
@@ -29,9 +26,10 @@ public class OperacionesRelacionalesPanel extends JPanel {
         });
         campoCondicion = new JTextField();
         botonEjecutar = new JButton("Ejecutar Operación");
-        areaResultado = new JTextArea();
-        areaResultado.setEditable(false);
-        JScrollPane scrollResultado = new JScrollPane(areaResultado);
+        modeloTabla = new DefaultTableModel();
+        tablaResultado = new JTable(modeloTabla);
+        tablaResultado.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        JScrollPane scrollResultado = new JScrollPane(tablaResultado);
 
         panelEntrada.add(new JLabel("Tabla 1 (o 'Resultado anterior')"));
         panelEntrada.add(campoTabla1);
@@ -84,48 +82,44 @@ public class OperacionesRelacionalesPanel extends JPanel {
                     List<Map<String, String>> datos = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
                             ? obtenerFilasDesdeResultadoAnterior()
                             : ejecutarSeleccion(conn, tabla1, condicion);
-                    resultadoRelacion = new ResultadoRelacion("Seleccion_" + tabla1, datos);
+                    List<String> columnas = (datos.isEmpty() && resultadoAnterior != null)
+                            ? resultadoAnterior.columnas
+                            : new ArrayList<>(datos.isEmpty() ? obtenerColumnas(conn, tabla1) : datos.get(0).keySet());
+                    resultadoRelacion = new ResultadoRelacion("Seleccion_" + tabla1, datos, columnas);
                 }
                 case "PROYECCIÓN" -> {
                     List<Map<String, String>> datos = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
                             ? ejecutarProyeccionDirecta(resultadoAnterior.filas, condicion)
                             : ejecutarProyeccion(conn, tabla1, condicion);
-                    resultadoRelacion = new ResultadoRelacion("Proyeccion_" + tabla1, datos);
+                    List<String> columnas = Arrays.stream(condicion.split(",")).map(String::trim).toList();
+                    resultadoRelacion = new ResultadoRelacion("Proyeccion_" + tabla1, datos, columnas);
                 }
-                case "UNION" -> {
+                case "UNION", "INTERSECCIÓN", "DIFERENCIA", "PRODUCTO CARTESIANO", "JOIN (natural)" -> {
                     List<Map<String, String>> R = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
                             ? resultadoAnterior.filas
                             : obtenerFilas(conn, tabla1);
                     List<Map<String, String>> S = obtenerFilas(conn, tabla2);
-                    resultadoRelacion = new ResultadoRelacion("Union_" + tabla1 + "_" + tabla2, ejecutarUnion(R, S));
-                }
-                case "INTERSECCIÓN" -> {
-                    List<Map<String, String>> R = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
-                            ? resultadoAnterior.filas
-                            : obtenerFilas(conn, tabla1);
-                    List<Map<String, String>> S = obtenerFilas(conn, tabla2);
-                    resultadoRelacion = new ResultadoRelacion("Interseccion_" + tabla1 + "_" + tabla2, ejecutarInterseccion(R, S));
-                }
-                case "DIFERENCIA" -> {
-                    List<Map<String, String>> R = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
-                            ? resultadoAnterior.filas
-                            : obtenerFilas(conn, tabla1);
-                    List<Map<String, String>> S = obtenerFilas(conn, tabla2);
-                    resultadoRelacion = new ResultadoRelacion("Diferencia_" + tabla1 + "_" + tabla2, ejecutarDiferencia(R, S));
-                }
-                case "PRODUCTO CARTESIANO" -> {
-                    List<Map<String, String>> R = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
-                            ? resultadoAnterior.filas
-                            : obtenerFilas(conn, tabla1);
-                    List<Map<String, String>> S = obtenerFilas(conn, tabla2);
-                    resultadoRelacion = new ResultadoRelacion("Producto_" + tabla1 + "_" + tabla2, ejecutarProductoCartesiano(R, S, tabla1, tabla2));
-                }
-                case "JOIN (natural)" -> {
-                    List<Map<String, String>> R = tabla1.equalsIgnoreCase("Resultado anterior") && resultadoAnterior != null
-                            ? resultadoAnterior.filas
-                            : obtenerFilas(conn, tabla1);
-                    List<Map<String, String>> S = obtenerFilas(conn, tabla2);
-                    resultadoRelacion = new ResultadoRelacion("Join_" + tabla1 + "_" + tabla2, ejecutarJoinNatural(R, S));
+                    List<Map<String, String>> datos = switch (operacion) {
+                        case "UNION" -> ejecutarUnion(R, S);
+                        case "INTERSECCIÓN" -> ejecutarInterseccion(R, S);
+                        case "DIFERENCIA" -> ejecutarDiferencia(R, S);
+                        case "PRODUCTO CARTESIANO" -> ejecutarProductoCartesiano(R, S, tabla1, tabla2);
+                        case "JOIN (natural)" -> ejecutarJoinNatural(R, S);
+                        default -> new ArrayList<>();
+                    };
+                    List<String> columnas;
+                    if (!datos.isEmpty()) {
+                        columnas = new ArrayList<>(datos.get(0).keySet());
+                    } else if (!R.isEmpty()) {
+                        columnas = new ArrayList<>(R.get(0).keySet());
+                    } else if (!S.isEmpty()) {
+                        columnas = new ArrayList<>(S.get(0).keySet());
+                    } else if (resultadoAnterior != null && resultadoAnterior.columnas != null) {
+                        columnas = resultadoAnterior.columnas;
+                    } else {
+                        columnas = obtenerColumnas(conn, tabla1);
+                    }
+                    resultadoRelacion = new ResultadoRelacion(operacion + "" + tabla1 + "" + tabla2, datos, columnas);
                 }
             }
 
@@ -133,11 +127,11 @@ public class OperacionesRelacionalesPanel extends JPanel {
                 resultadoAnterior = resultadoRelacion;
                 mostrarResultadoConNombre(resultadoRelacion);
             } else {
-                areaResultado.setText("No se pudo obtener resultado.");
+                JOptionPane.showMessageDialog(this, "No se pudo obtener resultado.");
             }
 
         } catch (SQLException ex) {
-            areaResultado.setText("Error: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error de SQL", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -155,6 +149,8 @@ public class OperacionesRelacionalesPanel extends JPanel {
                 col = col.trim();
                 if (fila.containsKey(col)) {
                     nueva.put(col, fila.get(col));
+                } else {
+                    nueva.put(col, "NULL");
                 }
             }
             resultado.add(nueva);
@@ -240,27 +236,68 @@ public class OperacionesRelacionalesPanel extends JPanel {
     }
 
     private void mostrarResultadoConNombre(ResultadoRelacion resultado) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Nombre del resultado: ").append(resultado.nombre).append("\n\n");
+        DefaultTableModel modelo = new DefaultTableModel();
+        for (String columna : resultado.columnas) {
+            modelo.addColumn(columna);
+        }
 
-        if (resultado.filas.isEmpty()) {
-            sb.append("Resultado vacío");
-        } else {
-            Set<String> columnas = resultado.filas.get(0).keySet();
-            sb.append(String.join("\t", columnas)).append("\n");
-            for (Map<String, String> fila : resultado.filas) {
-                for (String col : columnas) {
-                    sb.append(fila.getOrDefault(col, "NULL")).append("\t");
-                }
-                sb.append("\n");
+        for (Map<String, String> fila : resultado.filas) {
+            Object[] datosFila = resultado.columnas.stream()
+                    .map(col -> fila.getOrDefault(col, "NULL"))
+                    .toArray();
+            modelo.addRow(datosFila);
+        }
+
+        JTable tabla = new JTable(modelo);
+        ajustarAnchoColumnas(tabla);
+
+        JScrollPane nuevoScroll = new JScrollPane(tabla);
+        nuevoScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+        BorderLayout layout = (BorderLayout) getLayout();
+        Component componenteCentral = layout.getLayoutComponent(BorderLayout.CENTER);
+        if (componenteCentral != null) {
+            remove(componenteCentral);
+        }
+
+        add(nuevoScroll, BorderLayout.CENTER);
+        revalidate();
+        repaint();
+    }
+
+
+
+
+    private List<String> obtenerColumnas(Connection conn, String tabla) throws SQLException {
+        List<String> columnas = new ArrayList<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tabla + " LIMIT 0")) {
+            ResultSetMetaData meta = rs.getMetaData();
+            for (int i = 1; i <= meta.getColumnCount(); i++) {
+                columnas.add(meta.getColumnName(i));
             }
         }
-        areaResultado.setText(sb.toString());
+        return columnas;
     }
+
+    private void ajustarAnchoColumnas(JTable tabla) {
+        for (int columna = 0; columna < tabla.getColumnCount(); columna++) {
+            TableColumn col = tabla.getColumnModel().getColumn(columna);
+            int anchoMax = 50;
+            for (int fila = 0; fila < tabla.getRowCount(); fila++) {
+                TableCellRenderer renderer = tabla.getCellRenderer(fila, columna);
+                Component comp = tabla.prepareRenderer(renderer, fila, columna);
+                anchoMax = Math.max(comp.getPreferredSize().width + 10, anchoMax);
+            }
+            col.setPreferredWidth(anchoMax);
+        }
+    }
+
 
     private List<Map<String, String>> ejecutarSeleccion(Connection conn, String tabla, String condicion) throws SQLException {
         List<Map<String, String>> resultado = new ArrayList<>();
         String query = "SELECT * FROM " + tabla + (condicion.isEmpty() ? "" : " WHERE " + condicion);
+        System.out.println("Ejecutando query de selección: " + query);
         try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
             ResultSetMetaData meta = rs.getMetaData();
             while (rs.next()) {
@@ -297,10 +334,17 @@ public class OperacionesRelacionalesPanel extends JPanel {
     private static class ResultadoRelacion {
         String nombre;
         List<Map<String, String>> filas;
+        List<String> columnas;
 
         ResultadoRelacion(String nombre, List<Map<String, String>> filas) {
+            this(nombre, filas, filas.isEmpty() ? new ArrayList<>() : new ArrayList<>(filas.get(0).keySet()));
+        }
+
+        ResultadoRelacion(String nombre, List<Map<String, String>> filas, List<String> columnas) {
             this.nombre = nombre;
             this.filas = filas;
+            this.columnas = columnas;
         }
     }
+
 }
