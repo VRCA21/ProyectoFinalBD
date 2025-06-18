@@ -8,7 +8,8 @@ import java.sql.*;
 import java.util.*;
 import java.util.List;
 
-public class OperacionesRelacionalesPanel extends JPanel { private final JTextField campoTabla1; private final JTextField campoTabla2; private final JComboBox<String> comboOperacion; private final JTextField campoCondicion; private final JButton botonEjecutar; private final JTable tablaResultado; private final DefaultTableModel modeloTabla;
+public class OperacionesRelacionalesPanel extends JPanel { private final JTextField campoTabla1; private final JTextField campoTabla2; private final JComboBox<String> comboOperacion; private final JTextField campoCondicion; private final JButton botonEjecutar; private final JTable tablaResultado; private final DefaultTableModel modeloTabla; private final JButton botonRefrescar;
+
 
     private ResultadoRelacion resultadoAnterior = null;
 
@@ -26,6 +27,7 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
         });
         campoCondicion = new JTextField();
         botonEjecutar = new JButton("Ejecutar Operación");
+        botonRefrescar = new JButton("Borrar Consultas");
         modeloTabla = new DefaultTableModel();
         tablaResultado = new JTable(modeloTabla);
         tablaResultado.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
@@ -41,6 +43,29 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
         panelEntrada.add(campoCondicion);
         panelEntrada.add(new JLabel());
         panelEntrada.add(botonEjecutar);
+        panelEntrada.add(new JLabel());
+        panelEntrada.add(botonRefrescar);
+        botonRefrescar.addActionListener(e -> {
+            resultadoAnterior = null;
+            campoTabla1.setText("");
+            campoTabla2.setText("");
+            campoCondicion.setText("");
+
+            BorderLayout layout = (BorderLayout) getLayout();
+            Component central = layout.getLayoutComponent(BorderLayout.CENTER);
+            if (central != null) {
+                remove(central);
+            }
+
+            JTable vacia = new JTable(new DefaultTableModel());
+            JScrollPane scrollVacio = new JScrollPane(vacia);
+            scrollVacio.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            scrollVacio.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+            add(scrollVacio, BorderLayout.CENTER);
+
+            revalidate();
+            repaint();
+        });
 
         add(panelEntrada, BorderLayout.NORTH);
         add(scrollResultado, BorderLayout.CENTER);
@@ -110,15 +135,29 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
                     List<String> columnas;
                     if (!datos.isEmpty()) {
                         columnas = new ArrayList<>(datos.get(0).keySet());
-                    } else if (!R.isEmpty()) {
-                        columnas = new ArrayList<>(R.get(0).keySet());
-                    } else if (!S.isEmpty()) {
-                        columnas = new ArrayList<>(S.get(0).keySet());
-                    } else if (resultadoAnterior != null && resultadoAnterior.columnas != null) {
-                        columnas = resultadoAnterior.columnas;
                     } else {
-                        columnas = obtenerColumnas(conn, tabla1);
+                        List<String> columnasR = obtenerColumnas(conn, tabla1);
+                        List<String> columnasS = obtenerColumnas(conn, tabla2);
+
+                        switch (operacion) {
+                            case "UNION", "INTERSECCIÓN", "DIFERENCIA" -> columnas = columnasR;
+                            case "PRODUCTO CARTESIANO" -> {
+                                columnas = new ArrayList<>();
+                                for (String col : columnasR) columnas.add(tabla1 + "." + col);
+                                for (String col : columnasS) columnas.add(tabla2 + "." + col);
+                            }
+                            case "JOIN (natural)" -> {
+                                columnas = new ArrayList<>();
+                                Set<String> comunes = new HashSet<>(columnasR);
+                                comunes.retainAll(columnasS);
+                                for (String col : columnasR) columnas.add(col);
+                                for (String col : columnasS)
+                                    if (!comunes.contains(col)) columnas.add(col);
+                            }
+                            default -> columnas = new ArrayList<>();
+                        }
                     }
+
                     resultadoRelacion = new ResultadoRelacion(operacion + "" + tabla1 + "" + tabla2, datos, columnas);
                 }
             }
