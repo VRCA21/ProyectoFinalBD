@@ -8,7 +8,18 @@ import java.sql.*;
 import java.util.*;
 import java.util.List;
 
-public class OperacionesRelacionalesPanel extends JPanel { private final JTextField campoTabla1; private final JTextField campoTabla2; private final JComboBox<String> comboOperacion; private final JTextField campoCondicion; private final JButton botonEjecutar; private final JTable tablaResultado; private final DefaultTableModel modeloTabla; private final JButton botonRefrescar;
+public class OperacionesRelacionalesPanel extends JPanel {
+    private final JTextField campoTabla1;
+    private final JTextField campoTabla2;
+    private final JComboBox<String> comboOperacion;
+    private final JTextField campoCondicion;
+    private final JButton botonEjecutar;
+    private final JTable tablaResultado;
+    private final DefaultTableModel modeloTabla;
+    private final JButton botonRefrescar;
+    private final JCheckBox checkResultadoAnterior;
+    private JLabel etiquetaTabla2;
+    private JLabel etiquetaCondicion;
 
 
     private ResultadoRelacion resultadoAnterior = null;
@@ -16,40 +27,91 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
     public OperacionesRelacionalesPanel() {
         setLayout(new BorderLayout());
 
-        JPanel panelEntrada = new JPanel(new GridLayout(6, 2, 5, 5));
+        JPanel panelEntrada = new JPanel(new GridLayout(8, 2, 5, 5));
         panelEntrada.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        checkResultadoAnterior = new JCheckBox("Usar resultado anterior");
         campoTabla1 = new JTextField();
         campoTabla2 = new JTextField();
+        JLabel etiquetaTabla2 = new JLabel("Tabla 2");
+        JLabel etiquetaCondicion = new JLabel("Condición");
+
         comboOperacion = new JComboBox<>(new String[]{
                 "SELECCIÓN", "PROYECCIÓN", "UNION", "INTERSECCIÓN",
                 "DIFERENCIA", "PRODUCTO CARTESIANO", "JOIN (natural)"
         });
+
         campoCondicion = new JTextField();
         botonEjecutar = new JButton("Ejecutar Operación");
         botonRefrescar = new JButton("Borrar Consultas");
+
         modeloTabla = new DefaultTableModel();
         tablaResultado = new JTable(modeloTabla);
         tablaResultado.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         JScrollPane scrollResultado = new JScrollPane(tablaResultado);
 
-        panelEntrada.add(new JLabel("Tabla 1 (o 'Resultado anterior')"));
+        // Inicialmente ocultar tabla2 y su etiqueta
+        etiquetaTabla2.setVisible(false);
+        campoTabla2.setVisible(false);
+
+        // Estructura de entrada
+        panelEntrada.add(checkResultadoAnterior);
+        panelEntrada.add(new JLabel());
+
+        panelEntrada.add(new JLabel("Tabla 1"));
         panelEntrada.add(campoTabla1);
-        panelEntrada.add(new JLabel("Tabla 2 (si aplica)"));
+
+        panelEntrada.add(etiquetaTabla2);  // ahora tenemos referencia
         panelEntrada.add(campoTabla2);
+
         panelEntrada.add(new JLabel("Operación"));
         panelEntrada.add(comboOperacion);
-        panelEntrada.add(new JLabel("Condición o atributos"));
+
+        panelEntrada.add(etiquetaCondicion);
         panelEntrada.add(campoCondicion);
+
         panelEntrada.add(new JLabel());
         panelEntrada.add(botonEjecutar);
         panelEntrada.add(new JLabel());
         panelEntrada.add(botonRefrescar);
+
+        // Mostrar/ocultar campo tabla2 según operación
+        comboOperacion.addActionListener(e -> {
+            String operacion = (String) comboOperacion.getSelectedItem();
+            boolean requiereTabla2 = operacion.equals("UNION") || operacion.equals("INTERSECCIÓN")
+                    || operacion.equals("DIFERENCIA") || operacion.equals("PRODUCTO CARTESIANO")
+                    || operacion.equals("JOIN (natural)");
+
+            etiquetaTabla2.setVisible(requiereTabla2);
+            campoTabla2.setVisible(requiereTabla2);
+            campoTabla2.setText(""); // Limpia para evitar confusión
+            boolean requiereCondicion = operacion.equals("SELECCIÓN") || operacion.equals("PROYECCIÓN");
+            etiquetaCondicion.setVisible(requiereCondicion);
+            campoCondicion.setVisible(requiereCondicion);
+            if (requiereCondicion) {
+                etiquetaCondicion.setText(operacion.equals("SELECCIÓN") ? "Condición" : "Atributos");
+            }
+            revalidate();  // Actualiza el layout
+            repaint();
+        });
+
+        checkResultadoAnterior.addActionListener(e -> {
+            boolean usarAnterior = checkResultadoAnterior.isSelected();
+            campoTabla1.setEnabled(!usarAnterior);
+            if (usarAnterior) {
+                campoTabla1.setText("");
+            }
+        });
+
         botonRefrescar.addActionListener(e -> {
             resultadoAnterior = null;
             campoTabla1.setText("");
             campoTabla2.setText("");
             campoCondicion.setText("");
+            checkResultadoAnterior.setSelected(false);
+            campoTabla1.setEnabled(true);
+            campoTabla2.setVisible(false);
+            etiquetaTabla2.setVisible(false);
 
             BorderLayout layout = (BorderLayout) getLayout();
             Component central = layout.getLayoutComponent(BorderLayout.CENTER);
@@ -74,7 +136,7 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
     }
 
     private void ejecutarOperacion(ActionEvent e) {
-        String tabla1 = campoTabla1.getText().trim();
+        String tabla1 = checkResultadoAnterior.isSelected() ? "Resultado anterior" : campoTabla1.getText().trim();
         String tabla2 = campoTabla2.getText().trim();
         String operacion = (String) comboOperacion.getSelectedItem();
         String condicion = campoCondicion.getText().trim();
@@ -124,6 +186,31 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
                             ? resultadoAnterior.filas
                             : obtenerFilas(conn, tabla1);
                     List<Map<String, String>> S = obtenerFilas(conn, tabla2);
+
+                    List<String> columnasR = obtenerColumnas(conn, tabla1);
+                    List<String> columnasS = obtenerColumnas(conn, tabla2);
+                    List<String> tiposR = ValidadorRelacional.obtenerTipos(conn, tabla1);
+                    List<String> tiposS = ValidadorRelacional.obtenerTipos(conn, tabla2);
+
+                    switch (operacion) {
+                        case "UNION", "INTERSECCIÓN", "DIFERENCIA" -> {
+                            if (!ValidadorRelacional.columnasCompatibles(columnasR, columnasS)) {
+                                JOptionPane.showMessageDialog(this, "Las columnas deben coincidir en nombre y orden.", "Error de columnas", JOptionPane.WARNING_MESSAGE);
+                                return;
+                            }
+                            if (!ValidadorRelacional.tiposCompatibles(tiposR, tiposS)) {
+                                JOptionPane.showMessageDialog(this, "Los tipos de datos deben coincidir en orden.", "Error de tipos", JOptionPane.WARNING_MESSAGE);
+                                return;
+                            }
+                        }
+                        case "JOIN (natural)" -> {
+                            if (!ValidadorRelacional.hayColumnasComunes(columnasR, columnasS)) {
+                                JOptionPane.showMessageDialog(this, "Para un JOIN NATURAL debe haber al menos una columna con el mismo nombre entre ambas tablas.", "Sin columnas en común", JOptionPane.WARNING_MESSAGE);
+                                return;
+                            }
+                        }
+                    }
+
                     List<Map<String, String>> datos = switch (operacion) {
                         case "UNION" -> ejecutarUnion(R, S);
                         case "INTERSECCIÓN" -> ejecutarInterseccion(R, S);
@@ -132,13 +219,11 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
                         case "JOIN (natural)" -> ejecutarJoinNatural(R, S);
                         default -> new ArrayList<>();
                     };
+
                     List<String> columnas;
                     if (!datos.isEmpty()) {
                         columnas = new ArrayList<>(datos.get(0).keySet());
                     } else {
-                        List<String> columnasR = obtenerColumnas(conn, tabla1);
-                        List<String> columnasS = obtenerColumnas(conn, tabla2);
-
                         switch (operacion) {
                             case "UNION", "INTERSECCIÓN", "DIFERENCIA" -> columnas = columnasR;
                             case "PRODUCTO CARTESIANO" -> {
@@ -170,9 +255,11 @@ public class OperacionesRelacionalesPanel extends JPanel { private final JTextFi
             }
 
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error de SQL", JOptionPane.ERROR_MESSAGE);
+            String mensaje = UtilidadErroresSQL.traducir(ex);
+            JOptionPane.showMessageDialog(this, mensaje, "Error en la operación", JOptionPane.ERROR_MESSAGE);
         }
     }
+
 
     private List<Map<String, String>> obtenerFilasDesdeResultadoAnterior() {
         return resultadoAnterior != null ? resultadoAnterior.filas : new ArrayList<>();

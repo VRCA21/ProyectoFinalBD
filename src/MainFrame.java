@@ -11,6 +11,7 @@ public class MainFrame extends JFrame {
         setSize(900, 600);
         setLocationRelativeTo(null);
 
+
         cardLayout = new CardLayout();
         panelPrincipal = new JPanel(cardLayout);
 
@@ -43,7 +44,7 @@ public class MainFrame extends JFrame {
         add(panelPrincipal, BorderLayout.CENTER);
     }
 
-    public static void main(String[] args) {
+    /*public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new MainFrame().setVisible(true));
-    }
+    }*/
 }
