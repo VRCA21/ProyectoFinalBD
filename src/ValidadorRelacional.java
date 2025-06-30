@@ -28,8 +28,8 @@ public class ValidadorRelacional {
 
     public static List<String> obtenerTipos(Connection conn, String tabla) throws SQLException {
         List<String> tipos = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tabla + " LIMIT 0")) {
+        String query = "SELECT * FROM " + tabla + " LIMIT 0";
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
             ResultSetMetaData meta = rs.getMetaData();
             for (int i = 1; i <= meta.getColumnCount(); i++) {
                 tipos.add(meta.getColumnTypeName(i));
@@ -37,6 +37,7 @@ public class ValidadorRelacional {
         }
         return tipos;
     }
+
 
     public static boolean hayColumnasComunes(List<String> columnasA, List<String> columnasB) {
         for (String col : columnasA) {
