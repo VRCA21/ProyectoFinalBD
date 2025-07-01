@@ -5,18 +5,14 @@ import java.sql.*;
 public class CrearBaseDeDatosPanel extends JPanel {
     public CrearBaseDeDatosPanel() {
         setLayout(new BorderLayout());
-
-        // Título
         JLabel titulo = new JLabel("Crear Nueva Base de Datos");
         titulo.setFont(new Font("SansSerif", Font.BOLD, 22));
         titulo.setHorizontalAlignment(SwingConstants.CENTER);
         titulo.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
         add(titulo, BorderLayout.NORTH);
-
-        // Panel central con GridBagLayout
         JPanel panelFormulario = new JPanel(new GridBagLayout());
-        panelFormulario.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60)); // margen más grande
-        panelFormulario.setPreferredSize(new Dimension(500, 250)); // tamaño visual mayor
+        panelFormulario.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60));
+        panelFormulario.setPreferredSize(new Dimension(500, 250));
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(20, 10, 20, 10);
@@ -26,25 +22,17 @@ public class CrearBaseDeDatosPanel extends JPanel {
 
         JLabel labelNombre = new JLabel("Nombre de la base de datos:");
         labelNombre.setFont(new Font("SansSerif", Font.PLAIN, 18));
-
         JTextField campoBD = new JTextField(20);
         campoBD.setFont(new Font("SansSerif", Font.PLAIN, 18));
-
         JButton btnCrear = new JButton("Crear Base de Datos");
         btnCrear.setFont(new Font("SansSerif", Font.BOLD, 18));
         btnCrear.setPreferredSize(new Dimension(200, 40));
-
         panelFormulario.add(labelNombre, gbc);
-
         gbc.gridy++;
         panelFormulario.add(campoBD, gbc);
-
         gbc.gridy++;
         panelFormulario.add(btnCrear, gbc);
-
         add(panelFormulario, BorderLayout.CENTER);
-
-        // Acción del botón
         btnCrear.addActionListener(e -> {
             String nombreBD = campoBD.getText().trim();
             if (nombreBD.isEmpty()) {

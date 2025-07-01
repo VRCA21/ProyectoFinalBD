@@ -7,8 +7,6 @@ public class CrearTablaPanel extends JPanel {
     public CrearTablaPanel() {
         setLayout(new BorderLayout(20, 20));
         setBorder(BorderFactory.createEmptyBorder(30, 40, 20, 40));
-
-        // Panel superior (formulario)
         JPanel panelFormulario = new JPanel(new GridLayout(3, 2, 15, 15));
         Font fontCampos = new Font("SansSerif", Font.PLAIN, 18);
         Font fontEtiquetas = new Font("SansSerif", Font.BOLD, 18);
@@ -37,7 +35,6 @@ public class CrearTablaPanel extends JPanel {
 
         add(panelFormulario, BorderLayout.NORTH);
 
-        // Panel inferior (referencia de tipos de datos)
         JTextArea infoTipos = new JTextArea("""
 Tipos de atributos permitidos:
 
@@ -48,7 +45,7 @@ Tipos de atributos permitidos:
 • BOOLEAN — Verdadero/falso (ej. activo BOOLEAN)
 • TEXT — Texto largo
 """);
-        infoTipos.setFont(new Font("SansSerif", Font.PLAIN, 14));  // más pequeño
+        infoTipos.setFont(new Font("SansSerif", Font.PLAIN, 14));
         infoTipos.setMargin(new Insets(8, 12, 8, 12));
         infoTipos.setEditable(false);
         infoTipos.setLineWrap(true);
@@ -56,12 +53,10 @@ Tipos de atributos permitidos:
 
         JScrollPane scrollTipos = new JScrollPane(infoTipos);
         scrollTipos.setBorder(BorderFactory.createTitledBorder("Guía rápida de tipos de datos"));
-        scrollTipos.setPreferredSize(new Dimension(700, 180));  // más pequeño que antes
+        scrollTipos.setPreferredSize(new Dimension(700, 180));
         scrollTipos.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
         add(scrollTipos, BorderLayout.CENTER);
-
-        // Acción del botón
         btnCrear.addActionListener(e -> {
             String bd = EstadoApp.baseDeDatosActual;
             if (bd == null) {

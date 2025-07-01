@@ -10,34 +10,27 @@ public class SeleccionarBaseDeDatosPanel extends JPanel {
     public SeleccionarBaseDeDatosPanel() {
         setLayout(new BorderLayout());
 
-        // Título
         JLabel titulo = new JLabel("Seleccionar Base de Datos");
         titulo.setFont(new Font("SansSerif", Font.BOLD, 22));
         titulo.setHorizontalAlignment(SwingConstants.CENTER);
         titulo.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
         add(titulo, BorderLayout.NORTH);
-
-        // Panel central
         JPanel panelCentro = new JPanel(new GridBagLayout());
         panelCentro.setBorder(BorderFactory.createEmptyBorder(30, 60, 30, 60));
         panelCentro.setPreferredSize(new Dimension(500, 250));
-
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(20, 10, 20, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.gridy = 0;
-
         JLabel labelBD = new JLabel("Base de Datos:");
         labelBD.setFont(new Font("SansSerif", Font.PLAIN, 18));
         panelCentro.add(labelBD, gbc);
-
         gbc.gridy++;
         comboBD = new JComboBox<>();
         comboBD.setFont(new Font("SansSerif", Font.PLAIN, 18));
         comboBD.setPreferredSize(new Dimension(300, 30));
         panelCentro.add(comboBD, gbc);
-
         gbc.gridy++;
         btnSeleccionar = new JButton("Seleccionar");
         btnSeleccionar.setFont(new Font("SansSerif", Font.BOLD, 18));
@@ -51,8 +44,6 @@ public class SeleccionarBaseDeDatosPanel extends JPanel {
         panelCentro.add(btnActualizar, gbc);
 
         add(panelCentro, BorderLayout.CENTER);
-
-        // Eventos
         cargarBasesDeDatos();
 
         btnSeleccionar.addActionListener(e -> {

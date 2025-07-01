@@ -49,33 +49,23 @@ public class OperacionesRelacionalesPanel extends JPanel {
         tablaResultado = new JTable(modeloTabla);
         tablaResultado.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         JScrollPane scrollResultado = new JScrollPane(tablaResultado);
-
-        // Inicialmente ocultar tabla2 y su etiqueta
         etiquetaTabla2.setVisible(false);
         campoTabla2.setVisible(false);
-
-        // Estructura de entrada
         panelEntrada.add(checkResultadoAnterior);
         panelEntrada.add(new JLabel());
-
         panelEntrada.add(new JLabel("Tabla 1"));
         panelEntrada.add(campoTabla1);
-
-        panelEntrada.add(etiquetaTabla2);  // ahora tenemos referencia
+        panelEntrada.add(etiquetaTabla2);
         panelEntrada.add(campoTabla2);
-
         panelEntrada.add(new JLabel("Operación"));
         panelEntrada.add(comboOperacion);
-
         panelEntrada.add(etiquetaCondicion);
         panelEntrada.add(campoCondicion);
-
         panelEntrada.add(new JLabel());
         panelEntrada.add(botonEjecutar);
         panelEntrada.add(new JLabel());
         panelEntrada.add(botonRefrescar);
 
-        // Mostrar/ocultar campo tabla2 según operación
         comboOperacion.addActionListener(e -> {
             String operacion = (String) comboOperacion.getSelectedItem();
             boolean requiereTabla2 = operacion.equals("UNION") || operacion.equals("INTERSECCIÓN")
@@ -84,14 +74,14 @@ public class OperacionesRelacionalesPanel extends JPanel {
 
             etiquetaTabla2.setVisible(requiereTabla2);
             campoTabla2.setVisible(requiereTabla2);
-            campoTabla2.setText(""); // Limpia para evitar confusión
+            campoTabla2.setText("");
             boolean requiereCondicion = operacion.equals("SELECCIÓN") || operacion.equals("PROYECCIÓN");
             etiquetaCondicion.setVisible(requiereCondicion);
             campoCondicion.setVisible(requiereCondicion);
             if (requiereCondicion) {
                 etiquetaCondicion.setText(operacion.equals("SELECCIÓN") ? "Condición" : "Atributos");
             }
-            revalidate();  // Actualiza el layout
+            revalidate();
             repaint();
         });
 
@@ -136,8 +126,8 @@ public class OperacionesRelacionalesPanel extends JPanel {
     }
 
     private void ejecutarOperacion(ActionEvent e) {
-        String tabla1 = checkResultadoAnterior.isSelected() ? "RESULTADO_ANTERIOR" : campoTabla1.getText().trim();
         boolean usarResultadoAnterior = checkResultadoAnterior.isSelected();
+        String tabla1 = usarResultadoAnterior ? "RESULTADO_ANTERIOR" : campoTabla1.getText().trim();
         String tabla2 = campoTabla2.getText().trim();
         String operacion = (String) comboOperacion.getSelectedItem();
         String condicion = campoCondicion.getText().trim();
@@ -180,35 +170,55 @@ public class OperacionesRelacionalesPanel extends JPanel {
 
             switch (operacion) {
                 case "SELECCIÓN" -> {
-                    List<Map<String, String>> datos = usarResultadoAnterior && resultadoAnterior != null
-                            ? obtenerFilasDesdeResultadoAnterior()
-                            : ejecutarSeleccion(conn, tabla1, condicion);
-                    if (!validarCondicionTipo(tabla1, condicion, conn)) {
+                    if (!usarResultadoAnterior && !validarCondicionTipo(tabla1, condicion, conn)) {
                         JOptionPane.showMessageDialog(this, "La condición no coincide con el tipo de dato del atributo.",
                                 "Error de tipo de dato", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
+
+                    List<Map<String, String>> datos = usarResultadoAnterior && resultadoAnterior != null
+                            ? obtenerFilasDesdeResultadoAnterior()
+                            : ejecutarSeleccion(conn, tabla1, condicion);
+
                     List<String> columnas = (datos.isEmpty() && resultadoAnterior != null)
                             ? resultadoAnterior.columnas
                             : new ArrayList<>(datos.isEmpty() ? obtenerColumnas(conn, tabla1) : datos.get(0).keySet());
-                    resultadoRelacion = new ResultadoRelacion("Seleccion_" + tabla1, datos, columnas);
+
+                    resultadoRelacion = new ResultadoRelacion(
+                            "Seleccion_" + (usarResultadoAnterior ? "ResultadoAnterior" : tabla1),
+                            datos,
+                            columnas
+                    );
                 }
+
                 case "PROYECCIÓN" -> {
                     List<Map<String, String>> datos = usarResultadoAnterior && resultadoAnterior != null
                             ? ejecutarProyeccionDirecta(resultadoAnterior.filas, condicion)
                             : ejecutarProyeccion(conn, tabla1, condicion);
+
                     List<String> columnas = Arrays.stream(condicion.split(",")).map(String::trim).toList();
-                    resultadoRelacion = new ResultadoRelacion("Proyeccion_" + tabla1, datos, columnas);
+
+                    resultadoRelacion = new ResultadoRelacion(
+                            "Proyeccion_" + (usarResultadoAnterior ? "ResultadoAnterior" : tabla1),
+                            datos,
+                            columnas
+                    );
                 }
+
                 case "UNION", "INTERSECCIÓN", "DIFERENCIA", "PRODUCTO CARTESIANO", "JOIN (natural)" -> {
                     List<Map<String, String>> R = usarResultadoAnterior && resultadoAnterior != null
                             ? resultadoAnterior.filas
                             : obtenerFilas(conn, tabla1);
                     List<Map<String, String>> S = obtenerFilas(conn, tabla2);
 
-                    List<String> columnasR = obtenerColumnas(conn, tabla1);
+                    List<String> columnasR = usarResultadoAnterior && resultadoAnterior != null
+                            ? resultadoAnterior.columnas
+                            : obtenerColumnas(conn, tabla1);
                     List<String> columnasS = obtenerColumnas(conn, tabla2);
-                    List<String> tiposR = ValidadorRelacional.obtenerTipos(conn, tabla1);
+
+                    List<String> tiposR = usarResultadoAnterior && resultadoAnterior != null
+                            ? new ArrayList<>()  // No tenemos tipos, pero se asume válidos
+                            : ValidadorRelacional.obtenerTipos(conn, tabla1);
                     List<String> tiposS = ValidadorRelacional.obtenerTipos(conn, tabla2);
 
                     switch (operacion) {
@@ -279,11 +289,8 @@ public class OperacionesRelacionalesPanel extends JPanel {
         }
     }
 
-
     private boolean validarCondicionTipo(String tabla, String condicion, Connection conn) {
         if (condicion == null || condicion.isBlank()) return true;
-
-        // Solo soportamos una condición básica del tipo A = B
         String[] partes = condicion.split("=");
         if (partes.length != 2) return false;
 
@@ -303,8 +310,7 @@ public class OperacionesRelacionalesPanel extends JPanel {
                     if (tipo.contains("VARCHAR") || tipo.contains("CHAR") || tipo.contains("TEXT")) return true;
                     if (tipo.contains("DATE")) return valor.matches("\\d{4}-\\d{2}-\\d{2}");
                     if (tipo.contains("BOOLEAN")) return valor.equalsIgnoreCase("true") || valor.equalsIgnoreCase("false");
-
-                    return true; // aceptamos otros por defecto
+                    return true;
                 }
             }
         } catch (Exception e) {
@@ -338,20 +344,16 @@ public class OperacionesRelacionalesPanel extends JPanel {
     }
 
     private List<Map<String, String>> ejecutarUnion(List<Map<String, String>> R, List<Map<String, String>> S) {
-        List<Map<String, String>> resultado = new ArrayList<>(R);
-        for (Map<String, String> tupla : S) {
-            if (!resultado.contains(tupla)) {
-                resultado.add(tupla);
-            }
-        }
-        return resultado;
+        Set<Map<String, String>> conjunto = new LinkedHashSet<>(R);
+        conjunto.addAll(S);
+        return new ArrayList<>(conjunto);
     }
 
     private List<Map<String, String>> ejecutarInterseccion(List<Map<String, String>> R, List<Map<String, String>> S) {
         List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : R) {
-            if (S.contains(tupla)) {
-                resultado.add(tupla);
+        for (Map<String, String> filaR : R) {
+            if (S.contains(filaR)) {
+                resultado.add(filaR);
             }
         }
         return resultado;
@@ -359,9 +361,9 @@ public class OperacionesRelacionalesPanel extends JPanel {
 
     private List<Map<String, String>> ejecutarDiferencia(List<Map<String, String>> R, List<Map<String, String>> S) {
         List<Map<String, String>> resultado = new ArrayList<>();
-        for (Map<String, String> tupla : R) {
-            if (!S.contains(tupla)) {
-                resultado.add(tupla);
+        for (Map<String, String> filaR : R) {
+            if (!S.contains(filaR)) {
+                resultado.add(filaR);
             }
         }
         return resultado;
@@ -385,41 +387,41 @@ public class OperacionesRelacionalesPanel extends JPanel {
         return resultado;
     }
 
-    private List<Map<String, String>> ejecutarJoinNatural(List<Map<String, String>> R, List<Map<String, String>> S,
-                                                          List<String> columnasR, List<String> columnasS,
-                                                          String aliasT1, String aliasT2) {
-        List<Map<String, String>> resultado = new ArrayList<>();
-        if (R.isEmpty() || S.isEmpty()) return resultado;
+    private List<Map<String, String>> ejecutarJoinNatural(
+            List<Map<String, String>> R,
+            List<Map<String, String>> S,
+            List<String> columnasR,
+            List<String> columnasS,
+            String nombreTabla1,
+            String nombreTabla2) {
 
-        // Detectar columnas comunes
-        Set<String> columnasComunes = new HashSet<>(columnasR);
-        columnasComunes.retainAll(columnasS);
+        List<Map<String, String>> resultado = new ArrayList<>();
+        Set<String> comunes = new HashSet<>(columnasR);
+        comunes.retainAll(columnasS);
 
         for (Map<String, String> filaR : R) {
             for (Map<String, String> filaS : S) {
                 boolean coinciden = true;
-                for (String col : columnasComunes) {
-                    if (!Objects.equals(filaR.get(col), filaS.get(col))) {
+                for (String col : comunes) {
+                    String valR = filaR.get(col);
+                    String valS = filaS.get(col);
+                    if (valR == null || valS == null || !valR.equals(valS)) {
                         coinciden = false;
                         break;
                     }
                 }
+
                 if (coinciden) {
-                    Map<String, String> nueva = new LinkedHashMap<>();
-
-                    // Agrega todas las columnas de la tabla 1 (sin alias)
+                    Map<String, String> nuevaFila = new LinkedHashMap<>();
                     for (String col : columnasR) {
-                        nueva.put(col, filaR.get(col));
+                        nuevaFila.put(col, filaR.get(col));
                     }
-
-                    // Agrega columnas de la tabla 2 que no son comunes, con alias
                     for (String col : columnasS) {
-                        if (!columnasComunes.contains(col)) {
-                            nueva.put(aliasT2 + "." + col, filaS.get(col));
+                        if (!comunes.contains(col)) {
+                            nuevaFila.put(col, filaS.get(col));
                         }
                     }
-
-                    resultado.add(nueva);
+                    resultado.add(nuevaFila);
                 }
             }
         }
@@ -427,17 +429,13 @@ public class OperacionesRelacionalesPanel extends JPanel {
         return resultado;
     }
 
-
-
     private void mostrarResultadoConNombre(ResultadoRelacion resultado) {
         DefaultTableModel modelo = new DefaultTableModel();
 
-        // Agrega columnas
         for (String columna : resultado.columnas) {
             modelo.addColumn(columna);
         }
 
-        // Agrega filas
         for (Map<String, String> fila : resultado.filas) {
             Object[] datosFila = resultado.columnas.stream()
                     .map(col -> fila.getOrDefault(col, "NULL"))
@@ -452,14 +450,12 @@ public class OperacionesRelacionalesPanel extends JPanel {
         nuevoScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         nuevoScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
 
-        // Elimina componente anterior (si hay uno)
         BorderLayout layout = (BorderLayout) getLayout();
         Component central = layout.getLayoutComponent(BorderLayout.CENTER);
         if (central != null) {
             remove(central);
         }
 
-        // Genera título con alias si se usaron
         StringBuilder titulo = new StringBuilder("Resultado: " + resultado.nombre);
         if (resultado.aliasTabla1 != null && resultado.aliasTabla2 != null &&
                 !resultado.aliasTabla1.equals(resultado.aliasTabla2)) {
@@ -543,17 +539,14 @@ public class OperacionesRelacionalesPanel extends JPanel {
         String aliasTabla1;
         String aliasTabla2;
 
-        // Constructor básico sin alias ni tipos
         ResultadoRelacion(String nombre, List<Map<String, String>> filas, List<String> columnas) {
             this.nombre = nombre;
             this.filas = filas;
             this.columnas = columnas;
-            this.tipos = new ArrayList<>(); // vacío por defecto
+            this.tipos = new ArrayList<>();
             this.aliasTabla1 = null;
             this.aliasTabla2 = null;
         }
-
-        // Constructor con tipos pero sin alias
         ResultadoRelacion(String nombre, List<Map<String, String>> filas, List<String> columnas, List<String> tipos) {
             this.nombre = nombre;
             this.filas = filas;
@@ -563,7 +556,6 @@ public class OperacionesRelacionalesPanel extends JPanel {
             this.aliasTabla2 = null;
         }
 
-        // Constructor completo con alias y tipos
         ResultadoRelacion(String nombre, List<Map<String, String>> filas, List<String> columnas,
                           List<String> tipos, String aliasTabla1, String aliasTabla2) {
             this.nombre = nombre;

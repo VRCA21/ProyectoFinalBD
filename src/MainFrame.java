@@ -43,8 +43,4 @@ public class MainFrame extends JFrame {
         add(menu, BorderLayout.WEST);
         add(panelPrincipal, BorderLayout.CENTER);
     }
-
-    /*public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new MainFrame().setVisible(true));
-    }*/
 }

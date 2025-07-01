@@ -17,15 +17,12 @@ public class VerTablasPanel extends JPanel {
         listaTablas = new JList<>(modelo);
         JScrollPane scrollLista = new JScrollPane(listaTablas);
 
-        // Modelo y tabla para la estructura
         modeloEstructura = new DefaultTableModel();
         tablaEstructura = new JTable(modeloEstructura);
         JScrollPane scrollEstructura = new JScrollPane(tablaEstructura);
 
         JButton btnActualizar = new JButton("Actualizar");
         btnActualizar.addActionListener(e -> cargarTablas());
-
-        // Panel izquierdo (lista de tablas y botón)
         JPanel panelIzquierdo = new JPanel(new BorderLayout());
         panelIzquierdo.add(new JLabel("Tablas:"), BorderLayout.NORTH);
         panelIzquierdo.add(scrollLista, BorderLayout.CENTER);
@@ -34,7 +31,6 @@ public class VerTablasPanel extends JPanel {
         add(panelIzquierdo, BorderLayout.WEST);
         add(scrollEstructura, BorderLayout.CENTER);
 
-        // Evento al seleccionar una tabla
         listaTablas.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 String tabla = listaTablas.getSelectedValue();
@@ -82,7 +78,7 @@ public class VerTablasPanel extends JPanel {
             modeloEstructura.setColumnIdentifiers(new String[]{
                     "Campo", "Tipo", "Nulo", "Clave", "Predeterminado", "Extra"
             });
-            modeloEstructura.setRowCount(0); // limpiar filas
+            modeloEstructura.setRowCount(0);
 
             while (rs.next()) {
                 modeloEstructura.addRow(new Object[]{
